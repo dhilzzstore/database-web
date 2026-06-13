@@ -1,0 +1,630 @@
+<%- include('../partials/head') %>
+<% const pageTitle = 'Checkout QRIS'; %>
+<%- include('../partials/sidebar') %>
+
+<style>
+    :root {
+        --bg-deep: #04080f;
+        --bg-surface: rgba(8, 16, 36, 0.80);
+        --bg-glass: rgba(12, 22, 48, 0.60);
+        --blue-core: #1a6fff;
+        --blue-glow: #00b4ff;
+        --blue-dim: rgba(26, 111, 255, 0.18);
+        --green-ok: #00e676;
+        --red-err: #ff4b6e;
+        --amber: #ffb020;
+        --border-idle: rgba(26, 111, 255, 0.18);
+        --border-lit: rgba(0, 180, 255, 0.45);
+        --text-hi: #f0f6ff;
+        --text-mid: #7a9abf;
+        --text-lo: #3d5a7a;
+        --shadow-blue: 0 0 40px rgba(26, 111, 255, 0.12), 0 8px 32px rgba(0,0,0,0.5);
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+    }
+
+    .main-content {
+        background: var(--bg-deep);
+        color: var(--text-hi);
+        min-height: 100vh;
+    }
+
+    /* ─── Page wrapper ─── */
+    .co-wrap {
+        max-width: 440px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding-bottom: 48px;
+    }
+
+    /* ─── Main QRIS card ─── */
+    .co-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-idle);
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: var(--shadow-blue);
+        overflow: hidden;
+        transition: border-color 0.3s;
+    }
+
+    .co-card-head {
+        padding: 20px 24px 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .co-card-title {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-mid);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .co-card-title i { color: var(--blue-glow); font-size: 12px; }
+
+    /* ─── Order summary strip ─── */
+    .co-summary {
+        margin: 16px 24px;
+        background: rgba(4, 8, 15, 0.6);
+        border: 1px solid var(--border-idle);
+        border-radius: var(--radius-md);
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .co-summary-cell {
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .co-summary-cell:not(:last-child) {
+        border-right: 1px solid var(--border-idle);
+    }
+
+    .co-summary-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-lo);
+    }
+
+    .co-summary-val {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-hi);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .co-summary-val.price { color: var(--blue-glow); }
+
+    .co-summary-val.timer { color: var(--amber); font-variant-numeric: tabular-nums; }
+
+    .co-summary-val.expired-txt { color: var(--red-err); }
+
+    /* ─── Status pill (auto-check) ─── */
+    .co-status-pill {
+        margin: 0 24px;
+        border-radius: var(--radius-sm);
+        padding: 9px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 600;
+        gap: 8px;
+        transition: background 0.3s, border 0.3s;
+        border: 1px solid;
+    }
+
+    .co-status-pill.waiting {
+        background: rgba(26, 111, 255, 0.08);
+        border-color: var(--border-idle);
+        color: var(--blue-glow);
+    }
+
+    .co-status-pill.checking {
+        background: rgba(0, 180, 255, 0.08);
+        border-color: var(--border-lit);
+        color: var(--blue-glow);
+    }
+
+    .co-status-pill.success {
+        background: rgba(0, 230, 118, 0.1);
+        border-color: rgba(0, 230, 118, 0.3);
+        color: var(--green-ok);
+    }
+
+    .co-status-pill.failed {
+        background: rgba(255, 75, 110, 0.08);
+        border-color: rgba(255, 75, 110, 0.25);
+        color: var(--red-err);
+    }
+
+    .co-status-left {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .co-status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+    }
+
+    .co-status-pill.waiting .co-status-dot,
+    .co-status-pill.checking .co-status-dot {
+        animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .co-status-right {
+        font-size: 11px;
+        color: var(--text-lo);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .co-status-right:hover { color: var(--blue-glow); }
+
+    /* ─── QRIS image box (compact) ─── */
+    .co-qris-box {
+        margin: 12px 24px 0 24px;
+        background: #ffffff;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--border-lit);
+        box-shadow: 0 0 24px rgba(0, 180, 255, 0.15);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .co-qris-img {
+        display: block;
+        width: 100%;
+        max-width: 220px;
+        margin: 0 auto;
+        padding: 16px;
+        box-sizing: border-box;
+    }
+
+    .co-qris-loader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 48px 20px;
+        color: var(--text-mid);
+        font-size: 13px;
+    }
+
+    .co-qris-loader i {
+        font-size: 28px;
+        color: var(--blue-glow);
+    }
+
+    .co-qris-err {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 32px 20px;
+        color: var(--red-err);
+        font-size: 13px;
+        background: rgba(255, 75, 110, 0.04);
+    }
+
+    .co-qris-err i { font-size: 24px; }
+
+    /* Success overlay (plays over QRIS box) */
+    .co-success-overlay {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 40px 20px;
+        background: rgba(0, 230, 118, 0.06);
+        color: var(--green-ok);
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .co-success-overlay i { font-size: 36px; }
+
+    /* ─── Secure badge ─── */
+    .co-secure {
+        margin: 14px 24px 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-lo);
+    }
+
+    .co-secure i { color: var(--green-ok); }
+
+    /* ─── Back button ─── */
+    .co-back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px 20px;
+        background: var(--bg-glass);
+        border: 1px solid var(--border-idle);
+        border-radius: var(--radius-md);
+        color: var(--text-mid);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.25s;
+    }
+
+    .co-back-btn:hover {
+        border-color: var(--border-lit);
+        color: var(--text-hi);
+        background: var(--blue-dim);
+    }
+
+    /* ─── Manual check button ─── */
+    .co-check-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px;
+        margin: 0 0 0 0;
+        background: var(--blue-dim);
+        border: 1px solid var(--border-idle);
+        border-radius: var(--radius-md);
+        color: var(--blue-glow);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.25s;
+        letter-spacing: 0.03em;
+    }
+
+    .co-check-btn:hover {
+        background: rgba(26, 111, 255, 0.25);
+        border-color: var(--border-lit);
+    }
+
+    .co-check-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ─── Check actions row ─── */
+    .co-actions {
+        padding: 14px 24px 0 24px;
+        display: flex;
+        gap: 10px;
+    }
+
+    /* Success redirect banner */
+    .co-redirect-banner {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: rgba(0, 230, 118, 0.1);
+        border-top: 1px solid rgba(0, 230, 118, 0.2);
+        color: var(--green-ok);
+        font-size: 13px;
+        font-weight: 700;
+    }
+</style>
+
+<div class="main-content">
+    <%- include('../partials/topbar', {pageTitle, pageSub: 'Scan QR untuk menyelesaikan pembayaran'}) %>
+
+    <div class="page-content" style="padding: 20px 16px;">
+        <div class="co-wrap">
+
+            <!-- ─── QRIS Card ─── -->
+            <div class="co-card" id="coCard">
+
+                <div class="co-card-head">
+                    <div class="co-card-title">
+                        <i class="fas fa-qrcode"></i> Pembayaran QRIS
+                    </div>
+                    <div style="font-size: 11px; font-weight: 600; color: var(--text-lo); letter-spacing: 0.04em;">
+                        #<%= orderId.slice(-8).toUpperCase() %>
+                    </div>
+                </div>
+
+                <!-- Summary strip -->
+                <div class="co-summary">
+                    <div class="co-summary-cell">
+                        <span class="co-summary-label">Paket</span>
+                        <span class="co-summary-val" style="font-size: 12px;"><%= planData ? planData.name : planName %></span>
+                    </div>
+                    <div class="co-summary-cell">
+                        <span class="co-summary-label">Total</span>
+                        <span class="co-summary-val price">Rp<%= finalAmount.toLocaleString('id-ID') %></span>
+                    </div>
+                    <div class="co-summary-cell">
+                        <span class="co-summary-label">Sisa</span>
+                        <span class="co-summary-val timer" id="coTimer">—</span>
+                    </div>
+                </div>
+
+                <!-- Status pill -->
+                <div class="co-status-pill waiting" id="coStatusPill">
+                    <div class="co-status-left">
+                        <span class="co-status-dot"></span>
+                        <span id="coStatusText">Menunggu pembayaran</span>
+                    </div>
+                    <div class="co-status-right" onclick="manualCheck()" id="coStatusRefresh">
+                        <i class="fas fa-sync" id="coRefreshIcon"></i> Cek
+                    </div>
+                </div>
+
+                <!-- QRIS image container -->
+                <div class="co-qris-box" id="coQrisBox">
+                    <% if (paymentUrl) { %>
+                        <img src="<%= paymentUrl %>" class="co-qris-img" id="coQrisImg" alt="QRIS Code"
+                            onerror="showQrisError()">
+                    <% } else { %>
+                        <div class="co-qris-loader" id="coQrisLoader">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Memuat kode QRIS…</span>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Actions row -->
+                <div class="co-actions">
+                    <button class="co-check-btn" id="coCheckBtn" onclick="manualCheck()">
+                        <i class="fas fa-radar" id="coCheckIcon"></i>
+                        <span id="coCheckLabel">Cek Status Pembayaran</span>
+                    </button>
+                </div>
+
+                <!-- Success redirect banner (shown on paid) -->
+                <div class="co-redirect-banner" id="coRedirectBanner">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Pembayaran berhasil! Mengalihkan…</span>
+                </div>
+
+                <div class="co-secure">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Transaksi diproses aman via Pakasir</span>
+                </div>
+            </div>
+
+            <!-- ─── Back link ─── -->
+            <a href="/payment/detail?orderId=<%= orderId %>&paket=<%= plan %>" class="co-back-btn">
+                <i class="fas fa-arrow-left"></i> Kembali ke Detail Pesanan
+            </a>
+
+        </div>
+    </div>
+</div>
+
+<script>
+const _orderId    = <%- JSON.stringify(orderId) %>;
+const _plan       = <%- JSON.stringify(plan) %>;
+let   _payUrl     = <%- JSON.stringify(paymentUrl || "") %>;
+let   _expiredAt  = <%- JSON.stringify(expiredAt || "") %>;
+
+let _countdownId  = null;
+let _autoCheckId  = null;
+let _isChecking   = false;
+let _isDone       = false;
+
+/* ─── Toast helper ─── */
+function toast(msg, type) {
+    if (window.Luna?.toast) Luna.toast(msg, type);
+}
+
+/* ─── Timer countdown ─── */
+function updateTimer() {
+    const el = document.getElementById('coTimer');
+    if (!_expiredAt) { el.textContent = '—'; return; }
+    const diff = new Date(_expiredAt).getTime() - Date.now();
+    if (diff <= 0) {
+        el.textContent = 'Kadaluarsa';
+        el.classList.add('expired-txt');
+        el.classList.remove('timer');
+        clearInterval(_countdownId);
+        stopAutoCheck();
+        return;
+    }
+    const m = Math.floor(diff / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent = `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function startCountdown() {
+    clearInterval(_countdownId);
+    updateTimer();
+    _countdownId = setInterval(updateTimer, 1000);
+}
+
+/* ─── Render QRIS image ─── */
+function renderQris() {
+    const box = document.getElementById('coQrisBox');
+    box.innerHTML = `<img src="${_payUrl}" class="co-qris-img" id="coQrisImg" alt="QRIS Code" onerror="showQrisError()">`;
+}
+
+function showQrisError() {
+    const box = document.getElementById('coQrisBox');
+    box.innerHTML = `<div class="co-qris-err"><i class="fas fa-exclamation-triangle"></i><span>Gagal memuat gambar QRIS.<br>Coba muat ulang halaman.</span></div>`;
+}
+
+/* ─── Status UI helpers ─── */
+function setStatus(state, text) {
+    const pill = document.getElementById('coStatusPill');
+    const txt  = document.getElementById('coStatusText');
+    pill.className = 'co-status-pill ' + state;
+    txt.textContent = text;
+}
+
+/* ─── Generate QRIS if missing ─── */
+async function generateQris() {
+    try {
+        const r = await fetch('/payment/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: _orderId, paket: _plan })
+        });
+        const j = await r.json();
+        if (j.success && j.paymentUrl) {
+            _payUrl    = j.paymentUrl;
+            _expiredAt = j.expiredAt || '';
+            renderQris();
+            startCountdown();
+        } else {
+            const box = document.getElementById('coQrisBox');
+            box.innerHTML = `<div class="co-qris-err"><i class="fas fa-exclamation-triangle"></i><span>${j.message || 'Gagal memuat QRIS.'}</span></div>`;
+            toast(j.message || 'Gagal memuat QRIS.', 'error');
+        }
+    } catch {
+        showQrisError();
+        toast('Terjadi kesalahan sistem.', 'error');
+    }
+}
+
+/* ─── Check payment status ─── */
+async function checkStatus(silent = false) {
+    if (_isDone || _isChecking) return;
+    _isChecking = true;
+
+    const pill  = document.getElementById('coStatusPill');
+    const icon  = document.getElementById('coRefreshIcon');
+    const cBtn  = document.getElementById('coCheckBtn');
+    const cIcon = document.getElementById('coCheckIcon');
+    const cLbl  = document.getElementById('coCheckLabel');
+
+    pill.classList.add('checking');
+    if (icon)  icon.classList.add('fa-spin');
+    if (cBtn)  cBtn.disabled = true;
+    if (cIcon) cIcon.className = 'fas fa-spinner fa-spin';
+    if (cLbl)  cLbl.textContent = 'Memeriksa…';
+
+    try {
+        const r = await fetch(`/payment/status?orderId=${encodeURIComponent(_orderId)}`);
+        const j = await r.json();
+
+        if (j.status === 'success' || j.status === 'paid') {
+            onPaymentSuccess();
+        } else if (j.status === 'expired' || j.status === 'failed') {
+            _isDone = true;
+            stopAutoCheck();
+            setStatus('failed', j.status === 'expired' ? 'Transaksi kadaluarsa' : 'Pembayaran gagal');
+            toast('Transaksi ' + (j.status === 'expired' ? 'kadaluarsa.' : 'gagal.'), 'error');
+        } else {
+            setStatus('waiting', 'Menunggu pembayaran');
+            if (!silent) toast('Belum ada pembayaran masuk.', 'info');
+        }
+    } catch {
+        setStatus('waiting', 'Menunggu pembayaran');
+    } finally {
+        _isChecking = false;
+        if (icon)  icon.classList.remove('fa-spin');
+        if (cBtn)  cBtn.disabled = false;
+        if (cIcon) cIcon.className = 'fas fa-radar';
+        if (cLbl)  cLbl.textContent = 'Cek Status Pembayaran';
+    }
+}
+
+/* ─── Manual check (user-triggered) ─── */
+function manualCheck() { checkStatus(false); }
+
+/* ─── Auto-check every 5 seconds ─── */
+function startAutoCheck() {
+    stopAutoCheck();
+    _autoCheckId = setInterval(() => checkStatus(true), 5000);
+}
+
+function stopAutoCheck() {
+    clearInterval(_autoCheckId);
+    _autoCheckId = null;
+}
+
+/* ─── Handle success ─── */
+function onPaymentSuccess() {
+    _isDone = true;
+    stopAutoCheck();
+    clearInterval(_countdownId);
+
+    setStatus('success', 'Pembayaran berhasil!');
+
+    // Swap QRIS box with success overlay
+    const box = document.getElementById('coQrisBox');
+    box.innerHTML = `
+        <div class="co-success-overlay" style="display:flex;">
+            <i class="fas fa-check-circle"></i>
+            <span>Pembayaran Diterima!</span>
+        </div>`;
+
+    // Show redirect banner
+    const banner = document.getElementById('coRedirectBanner');
+    if (banner) banner.style.display = 'flex';
+
+    toast('Pembayaran berhasil! Mengalihkan…', 'success');
+
+    // Glow card border
+    document.getElementById('coCard').style.borderColor = 'rgba(0, 230, 118, 0.4)';
+
+    setTimeout(() => {
+        window.location.href = `/payment/success?orderId=${encodeURIComponent(_orderId)}`;
+    }, 1800);
+}
+
+/* ─── Init ─── */
+window.addEventListener('DOMContentLoaded', async () => {
+    // 1. Cek dulu apakah status sudah success sebelum render
+    try {
+        const r = await fetch(`/payment/status?orderId=${encodeURIComponent(_orderId)}`);
+        const j = await r.json();
+        if (j.status === 'success' || j.status === 'paid') {
+            window.location.replace(`/payment/success?orderId=${encodeURIComponent(_orderId)}`);
+            return;
+        }
+    } catch {}
+
+    // 2. Load QRIS
+    if (_payUrl) {
+        startCountdown();
+    } else {
+        await generateQris();
+    }
+
+    // 3. Start auto-check
+    startAutoCheck();
+});
+</script>
+
+<%- include('../partials/foot') %>
